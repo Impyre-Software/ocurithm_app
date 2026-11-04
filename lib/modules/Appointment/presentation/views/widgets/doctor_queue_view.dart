@@ -202,7 +202,13 @@ class _DoctorQueueViewState extends State<DoctorQueueView> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          '${status.label} · ${FormatHelper.formatDateTime(appointment.datetime?.toString())}',
+                                          // "Saved · Dilation — <time>" for a
+                                          // parked visit; "<status> — <time>"
+                                          // otherwise.
+                                          '${appointment.saveReasonName == null ? status.label : '${status.label} · ${appointment.saveReasonName}'}'
+                                          '  —  ${FormatHelper.formatDateTime(appointment.datetime?.toString())}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                               fontSize: 12,
                                               color: status.color),

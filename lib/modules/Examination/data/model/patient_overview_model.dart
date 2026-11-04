@@ -84,6 +84,9 @@ class PatientAppointment {
   /// rather than as a list of dates.
   final List<PatientAppointmentAction> actions;
 
+  /// Present only while [status] is `Saved`: why the visit was parked.
+  final String? saveReasonName;
+
   PatientAppointment({
     this.id,
     this.typeName,
@@ -94,6 +97,7 @@ class PatientAppointment {
     this.description,
     this.examinationId,
     this.actions = const [],
+    this.saveReasonName,
   });
 
   factory PatientAppointment.fromJson(Map<String, dynamic> json) {
@@ -110,6 +114,12 @@ class PatientAppointment {
           ? const []
           : List<PatientAppointmentAction>.from(json['actions']
               .map((x) => PatientAppointmentAction.fromJson(x))),
+      saveReasonName: json['status'] == 'Saved' &&
+              json['saveReason'] is Map &&
+              (json['saveReason']['name']?.toString().trim().isNotEmpty ??
+                  false)
+          ? json['saveReason']['name'].toString().trim()
+          : null,
     );
   }
 }

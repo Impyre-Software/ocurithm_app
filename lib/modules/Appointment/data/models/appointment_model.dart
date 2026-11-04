@@ -57,6 +57,8 @@ class Appointment {
     required this.id,
     this.sequence,
     this.error,
+    this.arrivedAt,
+    this.saveReason,
   });
 
   Clinic? clinic;
@@ -78,6 +80,12 @@ class Appointment {
   /// Per-doctor, per-day queue position — null on legacy rows the backfill
   /// script hasn't reached, or when the server hasn't assigned one yet.
   num? sequence;
+
+  /// Server-set when the patient is checked in (status → Arrived). Local time.
+  DateTime? arrivedAt;
+
+  /// Present only while [status] is `Saved`: why the visit was parked (latest save).
+  AppointmentSaveReason? saveReason;
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
     try {
@@ -109,6 +117,12 @@ class Appointment {
         updatedAt: DateTime.tryParse(json["updatedAt"] ?? ""),
         id: json["id"],
         sequence: json["sequence"],
+        arrivedAt: json["arrivedAt"] == null
+            ? null
+            : DateTime.tryParse(json["arrivedAt"].toString())?.toLocal(),
+        saveReason: json["saveReason"] is Map<String, dynamic>
+            ? AppointmentSaveReason.fromJson(json["saveReason"])
+            : null,
       );
     } catch (e) {
       log(e.toString());
@@ -132,6 +146,8 @@ class Appointment {
         "updatedAt": updatedAt?.toIso8601String(),
         "id": id,
         "sequence": sequence,
+        "arrivedAt": arrivedAt?.toUtc().toIso8601String(),
+        "saveReason": saveReason?.toJson(),
       };
 
   Appointment copyWith({
@@ -151,6 +167,8 @@ class Appointment {
     String? id,
     num? sequence,
     String? error,
+    DateTime? arrivedAt,
+    AppointmentSaveReason? saveReason,
   }) {
     return Appointment(
       clinic: clinic ?? this.clinic,
@@ -169,8 +187,46 @@ class Appointment {
       id: id ?? this.id,
       sequence: sequence ?? this.sequence,
       error: error ?? this.error,
+      arrivedAt: arrivedAt ?? this.arrivedAt,
+      saveReason: saveReason ?? this.saveReason,
     );
   }
+
+  /// The save reason to show beside the status, or null. Read only while the visit
+  /// is parked, so a row whose status changed locally never keeps a stale reason.
+  String? get saveReasonName {
+    if (status != 'Saved') return null;
+    final name = saveReason?.name?.trim();
+    return (name == null || name.isEmpty) ? null : name;
+  }
+
+  /// The note, trimmed; null when there is nothing worth showing.
+  String? get visibleNote {
+    final text = note?.trim();
+    return (text == null || text.isEmpty) ? null : text;
+  }
+}
+
+/// Why a parked visit was saved, as returned beside a `Saved` appointment.
+class AppointmentSaveReason {
+  AppointmentSaveReason({required this.name, this.savedAt});
+
+  String? name;
+  DateTime? savedAt;
+
+  factory AppointmentSaveReason.fromJson(Map<String, dynamic> json) {
+    return AppointmentSaveReason(
+      name: json["name"]?.toString(),
+      savedAt: json["savedAt"] == null
+          ? null
+          : DateTime.tryParse(json["savedAt"].toString())?.toLocal(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        "name": name,
+        "savedAt": savedAt?.toUtc().toIso8601String(),
+      };
 }
 
 class CreatedBy {
