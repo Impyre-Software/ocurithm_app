@@ -38,12 +38,16 @@ class EditAppointmentEvent extends AppointmentEvent {
   final String? doctor;
   final BuildContext context;
 
+  /// Required by the API when [action] is `cancel`.
+  final model.AppointmentCancellationReason? cancellationReason;
+
   EditAppointmentEvent({
     required this.id,
     required this.action,
     required this.context,
     this.date,
     this.doctor,
+    this.cancellationReason,
   });
 }
 

@@ -3,6 +3,7 @@ import '../../../../../core/api/api_handler.dart';
 import '../../../Branch/data/model/branches_model.dart';
 import '../../../Branch/data/model/data.dart';
 import '../../../Doctor/data/model/capability_model.dart';
+import '../../../Login/data/model/login_response.dart';
 import '../models/add_reception_model.dart';
 import '../models/receptionists_model.dart';
 import 'receptionist_repo.dart';
@@ -105,6 +106,20 @@ class ReceptionistRepoImpl implements ReceptionistRepo {
     } catch (e) {
       rethrow;
     }
+  }
+
+  @override
+  Future<CapabilityCatalog> getCapabilityCatalog() async {
+    final response = await _apiHandler.get<CapabilityCatalog>(
+      '${ApiConstants.capabilities}/catalog',
+      cancelKey: 'getCapabilityCatalog',
+      fromJson: (json) =>
+          CapabilityCatalog.fromJson(Map<String, dynamic>.from(json)),
+    );
+    if (response.success && response.data != null) {
+      return response.data!;
+    }
+    throw Exception(response.message ?? 'Failed to fetch capability catalog');
   }
 
   Future<CapabilityModel> getAllCapability() async {

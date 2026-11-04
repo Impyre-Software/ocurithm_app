@@ -1,6 +1,7 @@
 import '../../../Branch/data/model/branches_model.dart';
 import '../../../Branch/data/model/data.dart';
 import '../../../Doctor/data/model/capability_model.dart';
+import '../../../Login/data/model/login_response.dart';
 import '../models/add_reception_model.dart';
 import '../models/receptionists_model.dart';
 
@@ -40,4 +41,7 @@ abstract class ReceptionistRepo {
   Future<BranchesModel> getAllBranches();
 
   Future<CapabilityModel> getAllCapability();
+
+  /// Areas and task bundles for the capability editor.
+  Future<CapabilityCatalog> getCapabilityCatalog();
 }

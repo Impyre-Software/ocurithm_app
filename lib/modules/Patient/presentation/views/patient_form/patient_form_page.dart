@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:ocurithm/core/utils/auth_service.dart';
 import 'package:ocurithm/core/utils/capability_keys.dart';
 import 'package:ocurithm/core/utils/constant.dart';
+import 'package:ocurithm/core/utils/egypt_locations.dart';
 import 'package:ocurithm/core/utils/services_locator.dart';
 import 'package:ocurithm/core/utils/snackbar_service.dart';
 import 'package:ocurithm/core/widgets/DropdownPackage.dart';
@@ -29,6 +30,7 @@ import 'package:ocurithm/modules/Patient/presentation/manager/get_patient_examin
 import 'package:ocurithm/modules/Patient/presentation/manager/get_single_patient_cubit/get_single_patient_cubit.dart';
 import 'package:ocurithm/modules/Patient/presentation/manager/patient_actions_cubit/patient_actions_cubit.dart';
 import 'package:ocurithm/modules/Patient/presentation/views/widgets/transfer_patient_bottom_sheet.dart';
+import 'package:ocurithm/modules/Patient/presentation/views/patient_form/address_picker_fields.dart';
 import 'package:password_generator/password_generator.dart';
 
 import '../../../../../core/widgets/no_internet.dart';
@@ -99,6 +101,19 @@ class _PatientFormViewState extends State<PatientFormView> {
   late TextEditingController _nationalIdController;
 
   String? _phoneNumber;
+
+  // Registration's structured address; joined with the details text
+  // (_addressController) into the single `address` the API stores.
+  String _governorate = EgyptLocations.defaultGovernorate;
+  String? _area;
+
+  bool get _isAddMode => widget.mode == PatientFormMode.add;
+
+  String get _composedAddress => EgyptLocations.compose(
+        governorate: _governorate,
+        area: _area,
+        details: _addressController.text,
+      );
   DateTime? _birthDate;
   String? _selectedGender;
   Nationality? _selectedNationality;
@@ -817,15 +832,43 @@ class _PatientFormViewState extends State<PatientFormView> {
               const HeightSpacer(size: 20),
             ],
             _buildLabel(S.of(context).address, theme),
+            if (_isAddMode) ...[
+              // Registration picks governorate and area; editing keeps the one
+              // free-text address the API stores.
+              PatientAddressPicker(
+                governorate: _governorate,
+                area: _area,
+                onGovernorateChanged: (value) => setState(() {
+                  _governorate = value;
+                  // Areas belong to Alexandria.
+                  _area = null;
+                }),
+                onAreaChanged: (value) => setState(() => _area = value),
+              ),
+              const HeightSpacer(size: 12),
+            ],
             _buildCustomTextField(
               controller: _addressController,
-              hintText: S.of(context).address,
+              hintText:
+                  _isAddMode ? 'Street, building, floor' : S.of(context).address,
               icon: 'assets/icons/home.svg',
               showBorder: true,
               // Always bordered as per request
               required: false,
               validator: (v) => null,
+              onChanged: _isAddMode ? (_) => setState(() {}) : null,
             ),
+            if (_isAddMode && _composedAddress.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Text(
+                  'Saved as: $_composedAddress',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.hintColor),
+                ),
+              ),
+            ],
             const HeightSpacer(size: 20),
             _buildLabel(S.of(context).nationalId, theme),
             _buildCustomTextField(
@@ -1097,7 +1140,10 @@ class _PatientFormViewState extends State<PatientFormView> {
               height: 15, width: 15),
         ),
       ),
-      initialCountryCode: 'EG',
+      // A stored international number ("+963…") carries its own country; passing
+      // 'EG' would make the field keep Egypt and show "+963…" as the local part.
+      initialCountryCode:
+          (_phoneNumber ?? '').trim().startsWith('+') ? null : 'EG',
       dropdownIconPosition: IconPosition.leading,
       languageCode: "en",
       enabled: !_isReadOnly,
@@ -1411,7 +1457,7 @@ class _PatientFormViewState extends State<PatientFormView> {
       email: _emailController.text,
       phone: _phoneNumber,
       password: _passwordController.text,
-      address: _addressController.text,
+      address: _isAddMode ? _composedAddress : _addressController.text,
       nationalId: _nationalIdController.text,
       nationality: _selectedNationality?.value,
       birthDate: _birthDate,

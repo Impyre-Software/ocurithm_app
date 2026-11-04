@@ -22,11 +22,19 @@ class GetCapabilitiesCubit
 
     try {
       final response = await _receptionistRepo.getAllCapability();
+      // Best effort: without the catalog the editor still works as a flat list.
+      CapabilityCatalog? catalog;
+      try {
+        catalog = await _receptionistRepo.getCapabilityCatalog();
+      } catch (_) {
+        catalog = null;
+      }
 
       if (response.capabilities.isNotEmpty) {
         emit(state.copyWith(
           status: GetCapabilitiesStatus.success,
           capabilities: response.capabilities,
+          catalog: catalog,
         ));
       } else {
         emit(state.copyWith(

@@ -31,6 +31,7 @@ import '../../../data/models/appointment_model.dart';
 import '../../../data/repos/appointment_repo.dart';
 import '../../manager/Appointment cubit/appointment_cubit.dart';
 import 'appointment_note.dart';
+import 'cancel_appointment_sheet.dart';
 import 'delay_appointment.dart';
 import 'filter_appointment.dart';
 
@@ -111,9 +112,15 @@ class _AppointmentViewBodyState extends State<AppointmentViewBody> {
                     controller: _searchController,
                     backgroundColor: isDark ? theme.cardColor : Colors.white,
                     withShadow: true,
+                    // The branch/doctor filter lists come with the booking
+                    // capabilities too (the API accepts them on those lists).
                     isFiltered:
                         CapabilityServices.hasCapability('showBranches') ||
-                            CapabilityServices.hasCapability('showDoctors'),
+                            CapabilityServices.hasCapability('showDoctors') ||
+                            CapabilityServices.hasCapability(
+                                CapabilityKeys.addAppointments) ||
+                            CapabilityServices.hasCapability(
+                                CapabilityKeys.editAppointmentsReceptionist),
                     onChanged: () {
                       cubit.onSearchChanged(_searchController.text);
                     },
@@ -714,7 +721,7 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 _buildStatusBadge(appointment.status,
-                    reason: appointment.saveReasonName),
+                    reason: appointment.statusReason),
                 if (appointment.visibleNote != null)
                   AppointmentNoteChip(appointment: appointment),
               ],
@@ -1154,6 +1161,20 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
       default:
         icon = Icons.info_outline;
         color = Colorz.primaryColor;
+    }
+
+    // Cancelling asks why (the API requires a reason) instead of a yes/no.
+    if (action == 'cancel') {
+      showCancellationReasonSheet(context, appointment).then((reason) {
+        if (reason == null || !context.mounted) return;
+        cubit.add(EditAppointmentEvent(
+          context: context,
+          id: appointment.id.toString(),
+          action: action,
+          cancellationReason: reason,
+        ));
+      });
+      return;
     }
 
     showConfirmationDialog(

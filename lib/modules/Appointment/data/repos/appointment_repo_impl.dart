@@ -114,12 +114,15 @@ class AppointmentRepoImpl implements AppointmentRepo {
     required String action,
     DateTime? date,
     String? doctor,
+    AppointmentCancellationReason? cancellationReason,
   }) async {
     try {
       Map<String, dynamic> data = {
         "action": action,
         if (doctor != null) "doctor": doctor,
-        if (date != null) "datetime": date.toIso8601String()
+        if (date != null) "datetime": date.toIso8601String(),
+        if (cancellationReason != null)
+          "cancellationReason": cancellationReason.toJson(),
       };
 
       final response = await _apiHandler.put<Appointment>(

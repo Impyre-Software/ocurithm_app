@@ -205,7 +205,7 @@ class _DoctorQueueViewState extends State<DoctorQueueView> {
                                           // "Saved · Dilation — <time>" for a
                                           // parked visit; "<status> — <time>"
                                           // otherwise.
-                                          '${appointment.saveReasonName == null ? status.label : '${status.label} · ${appointment.saveReasonName}'}'
+                                          '${appointment.statusReason == null ? status.label : '${status.label} · ${appointment.statusReason}'}'
                                           '  —  ${FormatHelper.formatDateTime(appointment.datetime?.toString())}',
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,

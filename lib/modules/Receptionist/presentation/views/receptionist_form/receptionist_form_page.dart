@@ -805,6 +805,7 @@ class _ReceptionistFormViewState extends State<ReceptionistFormView> {
         if (state.isSuccess && state.capabilities != null) {
           return CapabilitiesSection(
             capabilities: state.capabilities!,
+            catalog: state.catalog,
             readOnly: _isReadOnly,
             initialSelectedCapabilities: capabilities ?? [],
             onSelectionChanged: (newSelection) {

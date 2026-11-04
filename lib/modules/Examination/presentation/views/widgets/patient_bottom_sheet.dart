@@ -601,16 +601,17 @@ class _AppointmentsSection extends StatelessWidget {
                                     color: statusColor.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  // A parked visit also names why: "SAVED · Dilation".
+                                  // A parked or cancelled visit also names why:
+                                  // "SAVED · Dilation", "CANCELLED · No-show".
                                   child: Text.rich(
                                     TextSpan(
                                       text: appointment.status?.toUpperCase() ??
                                           'N/A',
                                       children: [
-                                        if (appointment.saveReasonName != null)
+                                        if (appointment.statusReason != null)
                                           TextSpan(
                                             text:
-                                                ' · ${appointment.saveReasonName}',
+                                                ' · ${appointment.statusReason}',
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w500,
                                               letterSpacing: 0,
