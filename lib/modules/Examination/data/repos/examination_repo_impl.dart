@@ -57,9 +57,10 @@ class ExaminationRepoImpl implements ExaminationRepo {
   }
 
   @override
-  Future<void> deleteExamination(String id) async {
+  Future<void> deleteExamination(String id, {required String password}) async {
     final response = await _apiHandler.delete(
       "${ApiConstants.examination}/$id",
+      data: {"password": password},
       options: _getOptions(),
     );
     if (!response.success) {

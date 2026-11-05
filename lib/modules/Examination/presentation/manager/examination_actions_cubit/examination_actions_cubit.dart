@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../../core/utils/error_message.dart';
 import '../../../data/repos/examination_repo.dart';
 
 part 'examination_actions_event.dart';
@@ -72,17 +73,24 @@ class ExaminationActionsCubit extends Cubit<ExaminationActionsState> {
     }
   }
 
-  Future<void> deleteExamination(String id) async {
+  /// Deletes after the caller re-enters their [password]. Returns null on success,
+  /// otherwise the readable error, so the confirmation dialog can show it inline
+  /// and stay open (a wrong password reads "Incorrect password").
+  Future<String?> deleteExamination(String id,
+      {required String password}) async {
     emit(state.copyWith(status: ExaminationActionsStatus.loading));
     try {
-      await examinationRepo.deleteExamination(id);
+      await examinationRepo.deleteExamination(id, password: password);
       emit(state.copyWith(
         status: ExaminationActionsStatus.success,
         message: "Examination deleted successfully",
       ));
+      return null;
     } catch (e) {
+      final message = readableError(e);
       emit(state.copyWith(
-          status: ExaminationActionsStatus.error, error: e.toString()));
+          status: ExaminationActionsStatus.error, error: message));
+      return message;
     }
   }
 }

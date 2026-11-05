@@ -1,3 +1,6 @@
+import '../../../Appointment/data/models/appointment_model.dart'
+    show AppointmentCancellationReason;
+
 class PatientOverviewModel {
   final PatientOverviewInfo? patient;
   final List<PatientAppointment> appointments;
@@ -84,6 +87,10 @@ class PatientAppointment {
   /// rather than as a list of dates.
   final List<PatientAppointmentAction> actions;
 
+  /// The reason shown beside the status: the save reason while `Saved`, the
+  /// cancellation reason while `Cancelled`, otherwise null.
+  final String? statusReason;
+
   PatientAppointment({
     this.id,
     this.typeName,
@@ -94,6 +101,7 @@ class PatientAppointment {
     this.description,
     this.examinationId,
     this.actions = const [],
+    this.statusReason,
   });
 
   factory PatientAppointment.fromJson(Map<String, dynamic> json) {
@@ -110,8 +118,22 @@ class PatientAppointment {
           ? const []
           : List<PatientAppointmentAction>.from(json['actions']
               .map((x) => PatientAppointmentAction.fromJson(x))),
+      statusReason: _statusReasonFrom(json),
     );
   }
+}
+
+String? _statusReasonFrom(Map<String, dynamic> json) {
+  if (json['status'] == 'Saved' && json['saveReason'] is Map) {
+    final name = json['saveReason']['name']?.toString().trim();
+    return (name == null || name.isEmpty) ? null : name;
+  }
+  if (json['status'] == 'Cancelled' && json['cancellationReason'] is Map) {
+    return AppointmentCancellationReason.fromJson(
+            Map<String, dynamic>.from(json['cancellationReason']))
+        .displayText;
+  }
+  return null;
 }
 
 class PatientAppointmentAction {

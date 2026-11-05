@@ -222,20 +222,44 @@ class _ArrowTextFieldState extends State<ArrowTextField> {
               ],
             ),
           ),
-        Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(30),
-            // border: Border.all(color: Theme.of(context).dividerColor),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-                spreadRadius: 1,
-                blurRadius: 3,
-                offset: const Offset(0, 1),
+        // Signed refraction readings get a border in the badge's colour (green
+        // positive, red negative); zero/empty stay borderless. An input error
+        // turns it red regardless. Driven by the controller, like the badge, so
+        // it follows typing and the arrows.
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (context, value, child) {
+            final sign = widget.showSignIndicator
+                ? FormatHelper.measurementSign(value.text)
+                : 0;
+            final Color? borderColor = _errorText != null
+                ? Colors.red
+                : sign > 0
+                    ? Colors.green
+                    : sign < 0
+                        ? Colors.red
+                        : null;
+
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(30),
+                border: borderColor == null
+                    ? null
+                    : Border.all(color: borderColor, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        Theme.of(context).shadowColor.withValues(alpha: 0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
-            ],
-          ),
+              child: child,
+            );
+          },
           child: Row(
             children: [
               IconButton(

@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:month_picker_dialog/month_picker_dialog.dart';
+import 'package:ocurithm/core/utils/arrival_format.dart';
 import 'package:ocurithm/core/utils/capability_keys.dart';
 import 'package:ocurithm/core/utils/capability_services.dart';
 import 'package:ocurithm/core/utils/format_helper.dart';
@@ -29,6 +30,8 @@ import '../../../data/models/appointment_lifecycle_status.dart';
 import '../../../data/models/appointment_model.dart';
 import '../../../data/repos/appointment_repo.dart';
 import '../../manager/Appointment cubit/appointment_cubit.dart';
+import 'appointment_note.dart';
+import 'cancel_appointment_sheet.dart';
 import 'delay_appointment.dart';
 import 'filter_appointment.dart';
 
@@ -109,9 +112,15 @@ class _AppointmentViewBodyState extends State<AppointmentViewBody> {
                     controller: _searchController,
                     backgroundColor: isDark ? theme.cardColor : Colors.white,
                     withShadow: true,
+                    // The branch/doctor filter lists come with the booking
+                    // capabilities too (the API accepts them on those lists).
                     isFiltered:
                         CapabilityServices.hasCapability('showBranches') ||
-                            CapabilityServices.hasCapability('showDoctors'),
+                            CapabilityServices.hasCapability('showDoctors') ||
+                            CapabilityServices.hasCapability(
+                                CapabilityKeys.addAppointments) ||
+                            CapabilityServices.hasCapability(
+                                CapabilityKeys.editAppointmentsReceptionist),
                     onChanged: () {
                       cubit.onSearchChanged(_searchController.text);
                     },
@@ -255,8 +264,7 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
     if (_fetchingId == id || _freshAppointments.containsKey(id)) return;
     _fetchingId = id;
     try {
-      final fresh =
-          await sl<AppointmentRepo>().getAppointmentById(id: id);
+      final fresh = await sl<AppointmentRepo>().getAppointmentById(id: id);
       if (!mounted) return;
       setState(() {
         _freshAppointments[id] = fresh;
@@ -682,6 +690,7 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
                 ),
               ],
             ),
+            ..._buildArrivalRow(appointment, isDark),
             // const SizedBox(height: 8),
             // GestureDetector(
             //   onTap: () async {
@@ -704,7 +713,19 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
             //   ),
             // ),
             const SizedBox(height: 8),
-            _buildStatusBadge(appointment.status),
+            // Status (with the save reason when parked) and, when the booking
+            // carried one, the note.
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _buildStatusBadge(appointment.status,
+                    reason: appointment.statusReason),
+                if (appointment.visibleNote != null)
+                  AppointmentNoteChip(appointment: appointment),
+              ],
+            ),
             if (appointment.createdBy != null) ...[
               const SizedBox(height: 8),
               _buildInfoRow(
@@ -760,6 +781,49 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
     );
   }
 
+  /// "✓ Arrived 10:42 AM · 12 min late" under the patient's age, once checked in.
+  List<Widget> _buildArrivalRow(Appointment appointment, bool isDark) {
+    final arrival =
+        ArrivalFormat.describe(appointment.arrivedAt, appointment.datetime);
+    if (arrival == null) return const [];
+
+    return [
+      const SizedBox(height: 8),
+      Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.how_to_reg, size: 16, color: Colors.green.shade600),
+              const SizedBox(width: 8),
+              Text(
+                "Arrived ${arrival.time}",
+                style: appStyle(context, 16,
+                    isDark ? Colors.white : Colorz.black, FontWeight.w500),
+              ),
+            ],
+          ),
+          if (arrival.punctualityLabel != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: arrival.punctualityColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                arrival.punctualityLabel!,
+                style: appStyle(
+                    context, 12, arrival.punctualityColor, FontWeight.w600),
+              ),
+            ),
+        ],
+      ),
+    ];
+  }
+
   Widget _buildInfoRow(String iconPath, String text, bool isDark) {
     return Row(
       children: [
@@ -782,30 +846,44 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
   /// Colored status badge covering all ten backend lifecycle values, matching
   /// web's AppointmentStatus.tsx (mobile previously showed this as plain
   /// "Status: X" text with no visual distinction and no unknown-value guard).
-  Widget _buildStatusBadge(String? rawStatus) {
+  ///
+  /// A parked visit also carries its save reason: `Saved · Dilation`.
+  Widget _buildStatusBadge(String? rawStatus, {String? reason}) {
     final status = AppointmentLifecycleStatus.fromString(rawStatus);
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: status.color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: status.color.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(status.icon, size: 14, color: status.color),
-            const SizedBox(width: 6),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: status.color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: status.color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(status.icon, size: 14, color: status.color),
+          const SizedBox(width: 6),
+          Text(
+            status == AppointmentLifecycleStatus.unknown
+                ? (rawStatus ?? 'N/A')
+                : status.label,
+            style: appStyle(context, 13, status.color, FontWeight.w600),
+          ),
+          if (reason != null) ...[
             Text(
-              status == AppointmentLifecycleStatus.unknown
-                  ? (rawStatus ?? 'N/A')
-                  : status.label,
-              style: appStyle(context, 13, status.color, FontWeight.w600),
+              '  ·  ',
+              style: appStyle(context, 13, status.color.withValues(alpha: 0.6),
+                  FontWeight.w600),
+            ),
+            Flexible(
+              child: Text(
+                reason,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: appStyle(context, 13, status.color, FontWeight.w400),
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -1085,6 +1163,20 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
         color = Colorz.primaryColor;
     }
 
+    // Cancelling asks why (the API requires a reason) instead of a yes/no.
+    if (action == 'cancel') {
+      showCancellationReasonSheet(context, appointment).then((reason) {
+        if (reason == null || !context.mounted) return;
+        cubit.add(EditAppointmentEvent(
+          context: context,
+          id: appointment.id.toString(),
+          action: action,
+          cancellationReason: reason,
+        ));
+      });
+      return;
+    }
+
     showConfirmationDialog(
       context: context,
       title: "$title Appointment",
@@ -1114,6 +1206,8 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
     final fullList =
         context.read<AppointmentCubit>().state.appointments?.appointments ?? [];
     final queueMeta = computeAppointmentQueueMeta(fullList)[appointment.id];
+    final arrival =
+        ArrivalFormat.describe(appointment.arrivedAt, appointment.datetime);
 
     return GestureDetector(
       onTap: () {
@@ -1177,14 +1271,28 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
                   Flexible(
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
-                      child: Text(
-                        appointment.patient?.name ?? 'No Patient',
-                        style: appStyle(
-                            context,
-                            14,
-                            isDark ? Colors.white70 : Colors.black87,
-                            FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            appointment.patient?.name ?? 'No Patient',
+                            style: appStyle(
+                                context,
+                                14,
+                                isDark ? Colors.white70 : Colors.black87,
+                                FontWeight.w500),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          // Marks appointments with a booking note; the note
+                          // itself opens from the expanded card.
+                          if (appointment.visibleNote != null) ...[
+                            const SizedBox(width: 4),
+                            Icon(Icons.sticky_note_2_outlined,
+                                size: 14,
+                                semanticLabel: 'Has a note',
+                                color: Colors.amber.shade700),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -1192,6 +1300,45 @@ class _ExpandableTimeSlotsState extends State<ExpandableTimeSlots> {
               ),
             ),
           ),
+          // Check-in time, in the corner opposite the queue badge so the tile
+          // keeps its height and its neighbour in the row stays level.
+          if (arrival != null)
+            Positioned(
+              top: -8,
+              right: -6,
+              child: Tooltip(
+                message: arrival.punctualityLabel == null
+                    ? 'Arrived ${arrival.time}'
+                    : 'Arrived ${arrival.time} · ${arrival.punctualityLabel}',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade600,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black26, blurRadius: 2)
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.how_to_reg,
+                          size: 11, color: Colors.white),
+                      const SizedBox(width: 3),
+                      Text(
+                        arrival.shortTime,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // Queue position badge, matching web's absolute-positioned span.
           if (queueMeta != null)
             Positioned(

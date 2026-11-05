@@ -57,6 +57,9 @@ class Appointment {
     required this.id,
     this.sequence,
     this.error,
+    this.arrivedAt,
+    this.saveReason,
+    this.cancellationReason,
   });
 
   Clinic? clinic;
@@ -78,6 +81,15 @@ class Appointment {
   /// Per-doctor, per-day queue position — null on legacy rows the backfill
   /// script hasn't reached, or when the server hasn't assigned one yet.
   num? sequence;
+
+  /// Server-set when the patient is checked in (status → Arrived). Local time.
+  DateTime? arrivedAt;
+
+  /// Present only while [status] is `Saved`: why the visit was parked (latest save).
+  AppointmentSaveReason? saveReason;
+
+  /// Set when the appointment was cancelled.
+  AppointmentCancellationReason? cancellationReason;
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
     try {
@@ -109,6 +121,16 @@ class Appointment {
         updatedAt: DateTime.tryParse(json["updatedAt"] ?? ""),
         id: json["id"],
         sequence: json["sequence"],
+        arrivedAt: json["arrivedAt"] == null
+            ? null
+            : DateTime.tryParse(json["arrivedAt"].toString())?.toLocal(),
+        saveReason: json["saveReason"] is Map<String, dynamic>
+            ? AppointmentSaveReason.fromJson(json["saveReason"])
+            : null,
+        cancellationReason: json["cancellationReason"] is Map
+            ? AppointmentCancellationReason.fromJson(
+                Map<String, dynamic>.from(json["cancellationReason"]))
+            : null,
       );
     } catch (e) {
       log(e.toString());
@@ -132,6 +154,9 @@ class Appointment {
         "updatedAt": updatedAt?.toIso8601String(),
         "id": id,
         "sequence": sequence,
+        "arrivedAt": arrivedAt?.toUtc().toIso8601String(),
+        "saveReason": saveReason?.toJson(),
+        "cancellationReason": cancellationReason?.toJson(),
       };
 
   Appointment copyWith({
@@ -151,6 +176,9 @@ class Appointment {
     String? id,
     num? sequence,
     String? error,
+    DateTime? arrivedAt,
+    AppointmentSaveReason? saveReason,
+    AppointmentCancellationReason? cancellationReason,
   }) {
     return Appointment(
       clinic: clinic ?? this.clinic,
@@ -169,8 +197,104 @@ class Appointment {
       id: id ?? this.id,
       sequence: sequence ?? this.sequence,
       error: error ?? this.error,
+      arrivedAt: arrivedAt ?? this.arrivedAt,
+      saveReason: saveReason ?? this.saveReason,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
     );
   }
+
+  /// The save reason to show beside the status, or null. Read only while the visit
+  /// is parked, so a row whose status changed locally never keeps a stale reason.
+  String? get saveReasonName {
+    if (status != 'Saved') return null;
+    final name = saveReason?.name?.trim();
+    return (name == null || name.isEmpty) ? null : name;
+  }
+
+  /// The reason shown beside the status: the save reason while parked, the
+  /// cancellation reason once cancelled, otherwise null. Keyed on the status so a
+  /// row whose status changed locally never keeps a stale reason.
+  String? get statusReason {
+    if (status == 'Saved') return saveReasonName;
+    if (status == 'Cancelled') return cancellationReason?.displayText;
+    return null;
+  }
+
+  /// The note, trimmed; null when there is nothing worth showing.
+  String? get visibleNote {
+    final text = note?.trim();
+    return (text == null || text.isEmpty) ? null : text;
+  }
+}
+
+/// The fixed cancellation reasons in display order. Codes match the API's
+/// `CancellationReasonCode`; `other` requires a typed note. Mirrors web's
+/// `lib/appointment-status.ts`.
+const List<MapEntry<String, String>> cancellationReasons = [
+  MapEntry('patient_request', 'Patient requested'),
+  MapEntry('no_show', "Patient didn't show up"),
+  MapEntry('doctor_unavailable', 'Doctor unavailable'),
+  MapEntry('booked_by_mistake', 'Booked by mistake / duplicate'),
+  MapEntry('rescheduled', 'Rescheduled to another appointment'),
+  MapEntry('clinic_closed', 'Clinic closed / emergency'),
+  MapEntry('other', 'Other'),
+];
+
+const int cancellationNoteMaxLength = 300;
+
+/// Why an appointment was cancelled.
+class AppointmentCancellationReason {
+  const AppointmentCancellationReason({required this.code, this.note});
+
+  final String code;
+
+  /// Required for `other`.
+  final String? note;
+
+  /// "Patient didn't show up", or the typed text for Other.
+  String? get displayText {
+    final typed = note?.trim();
+    if (code == 'other') {
+      return (typed == null || typed.isEmpty) ? 'Other' : typed;
+    }
+    for (final reason in cancellationReasons) {
+      if (reason.key == code) return reason.value;
+    }
+    return (typed == null || typed.isEmpty) ? null : typed;
+  }
+
+  factory AppointmentCancellationReason.fromJson(Map<String, dynamic> json) =>
+      AppointmentCancellationReason(
+        code: '${json["code"] ?? ''}',
+        note: json["note"]?.toString(),
+      );
+
+  Map<String, dynamic> toJson() => {
+        "code": code,
+        if (note != null && note!.trim().isNotEmpty) "note": note!.trim(),
+      };
+}
+
+/// Why a parked visit was saved, as returned beside a `Saved` appointment.
+class AppointmentSaveReason {
+  AppointmentSaveReason({required this.name, this.savedAt});
+
+  String? name;
+  DateTime? savedAt;
+
+  factory AppointmentSaveReason.fromJson(Map<String, dynamic> json) {
+    return AppointmentSaveReason(
+      name: json["name"]?.toString(),
+      savedAt: json["savedAt"] == null
+          ? null
+          : DateTime.tryParse(json["savedAt"].toString())?.toLocal(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        "name": name,
+        "savedAt": savedAt?.toUtc().toIso8601String(),
+      };
 }
 
 class CreatedBy {

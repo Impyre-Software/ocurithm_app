@@ -9,6 +9,22 @@ import 'package:ocurithm/modules/Examination/data/catalog/history_catalog.dart';
 import 'package:ocurithm/modules/Examination/data/catalog/complain_catalog.dart';
 import 'package:ocurithm/modules/Patient/data/model/one_exam.dart';
 
+/// Whether a recorded value is worth showing in the examination details.
+///
+/// Empty means: null, blank text, the "-" placeholder dropdowns save when nothing
+/// was picked, "N/A", or an empty list. A real reading of 0 / "0.00" (plano) is a
+/// value. Mirrors web's `ExaminationDetailsDailog/has-value.ts`.
+bool hasEnteredValue(dynamic value) {
+  if (value == null) return false;
+  if (value is Iterable) return value.any(hasEnteredValue);
+  final text = value.toString().trim();
+  return text.isNotEmpty && text != '-' && text.toUpperCase() != 'N/A';
+}
+
+/// Shown for one eye's gap when the other eye recorded the field, so the two
+/// eyes' rows stay lined up.
+const String _emptyEyeValue = '—';
+
 /// Whether either eye carries a cycloplegic reading worth showing.
 bool _hasCycloplegicReading(ExaminationModel examination) {
   final measurements = examination.examination?.measurements ?? const [];
@@ -17,11 +33,76 @@ bool _hasCycloplegicReading(ExaminationModel examination) {
         m.cycloplegicSpherical,
         m.cycloplegicCylindrical,
         m.cycloplegicAxis,
-      ].any((value) {
-        if (value == null) return false;
-        final text = value.toString().trim();
-        return text.isNotEmpty && text != '-' && text != 'N/A';
-      }));
+      ].any(hasEnteredValue));
+}
+
+/// Untouched quadrants stay at 0 (the form's starting colour), so all-zero in
+/// both eyes means the confrontation field was never recorded.
+bool _hasConfrontationReading(ExaminationModel examination) {
+  final measurements = examination.examination?.measurements ?? const [];
+  return measurements.any((m) => [
+        m.topLeft,
+        m.topRight,
+        m.bottomLeft,
+        m.bottomRight,
+      ].any((value) => value != null && value != 0));
+}
+
+/// Whether either eye recorded any measurement at all. `toJson` omits the old
+/// glasses and near-addition fields, so those are checked explicitly.
+bool _hasAnyMeasurement(ExaminationModel examination) {
+  const skipped = {
+    'eye',
+    'examination',
+    'topLeft',
+    'topRight',
+    'bottomLeft',
+    'bottomRight',
+    'createdAt',
+    'updatedAt',
+    'id',
+  };
+  final measurements = examination.examination?.measurements ?? const [];
+  return _hasConfrontationReading(examination) ||
+      measurements.any((m) =>
+          [
+            m.oldSpherical,
+            m.oldCylindrical,
+            m.oldAxis,
+            m.oldGlassesVa,
+            m.nearVisionAddition,
+          ].any(hasEnteredValue) ||
+          m
+              .toJson()
+              .entries
+              .where((entry) => !skipped.contains(entry.key))
+              .any((entry) => hasEnteredValue(entry.value)));
+}
+
+bool _hasFinalizationContent(Finalization? finalization) =>
+    finalization != null &&
+    (hasEnteredValue(finalization.diagnosis) ||
+        finalization.actions.isNotEmpty ||
+        finalization.medicine.isNotEmpty);
+
+/// Whether the examination recorded anything beyond the patient's identity.
+bool _hasRecordedAnything(ExaminationModel examinationModel) {
+  final examination = examinationModel.examination;
+  final complain = examination?.complain;
+  final history = examination?.history;
+  return _hasFinalizationContent(examinationModel.finalization) ||
+      _hasAnyMeasurement(examinationModel) ||
+      (complain?.selectedComplaints.isNotEmpty ?? false) ||
+      (history?.selectedCategories.isNotEmpty ?? false) ||
+      [
+        complain?.complainOne,
+        complain?.complainTwo,
+        complain?.complainThree,
+        history?.presentIllness,
+        history?.pastHistory,
+        history?.medicationHistory,
+        history?.familyHistory,
+      ].any(hasEnteredValue);
 }
 
 class OneExaminationContent extends StatelessWidget {
@@ -49,6 +130,16 @@ class OneExaminationContent extends StatelessWidget {
 
           _buildEyeComparisonSection(context,
               examination: examination, isDark: isDark, theme: theme),
+
+          if (!_hasRecordedAnything(examination))
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'No data was recorded for this examination.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              ),
+            ),
         ],
       ),
     );
@@ -191,25 +282,6 @@ class OneExaminationContent extends StatelessWidget {
             ),
           ),
 
-          // Print Button for Medications
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.grey[900] : Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: isDark ? Colors.grey[800]! : Colors.grey[200]!),
-            ),
-            child: const Text(
-              'No medications prescribed',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
         ],
       ],
     );
@@ -225,8 +297,9 @@ class OneExaminationContent extends StatelessWidget {
           title: FormatHelper.capitalizeFirstLetter(action.action ?? ""),
           // Older records hold "IPD: 63" typed by hand; strip it so the label
           // this view adds is not doubled up.
-          content:
-              "IPD: ${GlassesPrescription.normalizeIpd(action.data).isEmpty ? 'N/A' : GlassesPrescription.normalizeIpd(action.data)}",
+          content: GlassesPrescription.normalizeIpd(action.data).isEmpty
+              ? ''
+              : "IPD: ${GlassesPrescription.normalizeIpd(action.data)}",
           onTap: () {
             generateAndPrintPrescription(
               examination: examinationModel,
@@ -444,15 +517,17 @@ class OneExaminationContent extends StatelessWidget {
                         Icon(Icons.print_outlined, color: Colorz.primaryColor)),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              content,
-              style: TextStyle(
-                fontSize: 15,
-                color: Theme.of(context).textTheme.bodyMedium?.color,
-                height: 1.5,
+            if (hasEnteredValue(content)) ...[
+              const SizedBox(height: 4),
+              Text(
+                content,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                  height: 1.5,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -722,13 +797,15 @@ class OneExaminationContent extends StatelessWidget {
                           color: Colorz.primaryColor,
                         ),
                       ),
-                      Text(
-                        examination.examination?.patient?.nationalId ??
-                            'Unknown',
-                        style: TextStyle(
-                          color: Colorz.primaryColor,
+                      if (hasEnteredValue(
+                          examination.examination?.patient?.nationalId))
+                        Text(
+                          examination.examination!.patient!.nationalId!
+                              .toString(),
+                          style: TextStyle(
+                            color: Colorz.primaryColor,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -738,17 +815,19 @@ class OneExaminationContent extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildInfoItem(
-                  icon: Icons.calendar_today,
-                  label: 'Age',
-                  value:
-                      '${calculateAge(examination.examination?.patient?.birthDate)}',
-                ),
-                _buildInfoItem(
-                  icon: Icons.person,
-                  label: 'Gender',
-                  value: examination.examination?.patient?.gender ?? 'N/A',
-                ),
+                if (examination.examination?.patient?.birthDate != null)
+                  _buildInfoItem(
+                    icon: Icons.calendar_today,
+                    label: 'Age',
+                    value:
+                        '${calculateAge(examination.examination?.patient?.birthDate)}',
+                  ),
+                if (hasEnteredValue(examination.examination?.patient?.gender))
+                  _buildInfoItem(
+                    icon: Icons.person,
+                    label: 'Gender',
+                    value: examination.examination!.patient!.gender!,
+                  ),
                 // _buildInfoItem(
                 //   icon: Icons.phone,
                 //   label: 'Contact',
@@ -765,7 +844,9 @@ class OneExaminationContent extends StatelessWidget {
   Widget _buildFinalizationSection(
       BuildContext context, ExaminationModel examination) {
     final finalization = examination.finalization;
-    if (finalization == null) return const SizedBox.shrink();
+    if (finalization == null || !_hasFinalizationContent(finalization)) {
+      return const SizedBox.shrink();
+    }
     return _buildExpandableFinalizationCard(context,
         finalization: finalization, examination: examination);
   }
@@ -798,8 +879,7 @@ class OneExaminationContent extends StatelessWidget {
           ),
           childrenPadding: const EdgeInsets.all(16),
           children: [
-            if (finalization.diagnosis != null &&
-                finalization.diagnosis!.isNotEmpty)
+            if (hasEnteredValue(finalization.diagnosis))
               SizedBox(
                 width: double.infinity,
                 child: Column(
@@ -1025,6 +1105,21 @@ class OneExaminationContent extends StatelessWidget {
     required int sectionIndex,
     required Map<String, dynamic> Function(bool isLeft) dataMapper,
   }) {
+    // Only fields recorded in at least one eye; the section disappears when none
+    // are. The eye without a value shows a dash so the rows stay lined up.
+    final rightData = dataMapper(false);
+    final leftData = dataMapper(true);
+    final keys = rightData.keys
+        .where((key) =>
+            hasEnteredValue(rightData[key]) || hasEnteredValue(leftData[key]))
+        .toList();
+    if (keys.isEmpty) return const SizedBox.shrink();
+
+    Map<String, dynamic> visible(Map<String, dynamic> data) => {
+          for (final key in keys)
+            key: hasEnteredValue(data[key]) ? data[key] : _emptyEyeValue,
+        };
+
     return _buildComparisonRow(
       context,
       rightChild: _buildExaminationSection(
@@ -1035,7 +1130,7 @@ class OneExaminationContent extends StatelessWidget {
         isDark: isDark,
         theme: theme,
         sectionIndex: sectionIndex,
-        data: dataMapper(false),
+        data: visible(rightData),
       ),
       leftChild: _buildExaminationSection(
         context,
@@ -1045,7 +1140,7 @@ class OneExaminationContent extends StatelessWidget {
         isDark: isDark,
         theme: theme,
         sectionIndex: sectionIndex,
-        data: dataMapper(true),
+        data: visible(leftData),
       ),
     );
   }
@@ -1054,7 +1149,8 @@ class OneExaminationContent extends StatelessWidget {
       {required ExaminationModel examination,
       required bool isDark,
       required ThemeData theme}) {
-    if (examination.examination?.measurements.isEmpty ?? true) {
+    if ((examination.examination?.measurements.isEmpty ?? true) ||
+        !_hasAnyMeasurement(examination)) {
       return const SizedBox.shrink();
     }
 
@@ -1069,13 +1165,14 @@ class OneExaminationContent extends StatelessWidget {
             leftChild: _buildEyeLabel(true),
           ),
           const HeightSpacer(size: 12),
-          _buildComparisonRow(
-            context,
-            rightChild: _buildQuadrantSection(context,
-                isLeft: false, examinationModel: examination),
-            leftChild: _buildQuadrantSection(context,
-                isLeft: true, examinationModel: examination),
-          ),
+          if (_hasConfrontationReading(examination))
+            _buildComparisonRow(
+              context,
+              rightChild: _buildQuadrantSection(context,
+                  isLeft: false, examinationModel: examination),
+              leftChild: _buildQuadrantSection(context,
+                  isLeft: true, examinationModel: examination),
+            ),
           _buildSectionComparison(
             context,
             title: 'Old Glasses',

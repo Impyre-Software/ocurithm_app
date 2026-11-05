@@ -27,6 +27,7 @@ import '../../../../../core/widgets/height_spacer.dart';
 import '../../../../../core/widgets/multi_select.dart';
 import '../../../../../core/widgets/text_field.dart';
 import '../../../../Appointment/data/models/appointment_model.dart';
+import '../../../../Appointment/presentation/views/widgets/appointment_note.dart';
 import '../../../../Medicine/presentation/manager/get_medicines_cubit/get_medicines_cubit.dart';
 
 class MultiStepFormView extends StatelessWidget {
@@ -95,26 +96,44 @@ class MultiStepFormView extends StatelessWidget {
                     Navigator.pop(context);
                   }
                 },
-                suffix: IconButton(
-                    onPressed: () async {
-                      WidgetsBinding.instance.focusManager.primaryFocus
-                          ?.unfocus();
-                      if (appointment.patient?.id != null) {
-                        showModalBottomSheet(
-                          context: context,
-                          backgroundColor: Colors.transparent,
-                          isScrollControlled: true,
-                          builder: (context) => PatientDetailsBottomSheet(
-                            patientId: appointment.patient!.id!,
-                          ),
-                        );
-                      }
-                    },
-                    icon: SvgPicture.asset(
-                      "assets/icons/patient.svg",
-                      colorFilter: ColorFilter.mode(
-                          Theme.of(context).iconTheme.color!, BlendMode.srcIn),
-                    )),
+                suffix: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // The booking note, so the doctor can read it mid-exam.
+                    if (appointment.visibleNote != null)
+                      IconButton(
+                        tooltip: 'Appointment note',
+                        onPressed: () {
+                          WidgetsBinding.instance.focusManager.primaryFocus
+                              ?.unfocus();
+                          showAppointmentNoteSheet(context, appointment);
+                        },
+                        icon: Icon(Icons.sticky_note_2_outlined,
+                            color: Colors.amber.shade700),
+                      ),
+                    IconButton(
+                        onPressed: () async {
+                          WidgetsBinding.instance.focusManager.primaryFocus
+                              ?.unfocus();
+                          if (appointment.patient?.id != null) {
+                            showModalBottomSheet(
+                              context: context,
+                              backgroundColor: Colors.transparent,
+                              isScrollControlled: true,
+                              builder: (context) => PatientDetailsBottomSheet(
+                                patientId: appointment.patient!.id!,
+                              ),
+                            );
+                          }
+                        },
+                        icon: SvgPicture.asset(
+                          "assets/icons/patient.svg",
+                          colorFilter: ColorFilter.mode(
+                              Theme.of(context).iconTheme.color!,
+                              BlendMode.srcIn),
+                        )),
+                  ],
+                ),
               ),
               Expanded(
                 // Wrapped with Expanded
@@ -708,6 +727,7 @@ class RightAutorefContent extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Spherical :",
                 selectedValue: cubit.rightAurorefSpherical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateRightEyeField('aurorefSpherical', selected);
                 },
@@ -717,6 +737,7 @@ class RightAutorefContent extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Cylindrical :",
                 selectedValue: cubit.rightAurorefCylindrical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateRightEyeField('aurorefCylindrical', selected);
                 },
@@ -768,6 +789,7 @@ class LeftAutorefContent extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Spherical :",
                 selectedValue: cubit.leftAurorefSpherical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateLeftEyeField('aurorefSpherical', selected);
                 },
@@ -777,6 +799,7 @@ class LeftAutorefContent extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Cylindrical :",
                 selectedValue: cubit.leftAurorefCylindrical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateLeftEyeField('aurorefCylindrical', selected);
                 },
@@ -828,6 +851,7 @@ class RightOldGlasses extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Spherical :",
                 selectedValue: cubit.rightOldSpherical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateRightEyeField('oldSpherical', selected);
                 },
@@ -837,6 +861,7 @@ class RightOldGlasses extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Cylindrical :",
                 selectedValue: cubit.rightOldCylindrical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateRightEyeField('oldCylindrical', selected);
                 },
@@ -899,6 +924,7 @@ class LeftOldGlasses extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Spherical :",
                 selectedValue: cubit.leftOldSpherical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateLeftEyeField('oldSpherical', selected);
                 },
@@ -908,6 +934,7 @@ class LeftOldGlasses extends StatelessWidget {
                 items: cubit.data['AurorefSpherical'] ?? [],
                 textRow: "Cylindrical :",
                 selectedValue: cubit.leftOldCylindrical,
+                showSignIndicator: true,
                 onChanged: (selected) {
                   cubit.updateLeftEyeField('oldCylindrical', selected);
                 },

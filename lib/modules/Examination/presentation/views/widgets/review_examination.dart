@@ -105,6 +105,8 @@ class _ExaminationReviewScreenState extends State<ExaminationReviewScreen>
                   _buildSynchronizedExaminationSection(
                     title: 'Old-Glasses',
                     sectionIndex: 0,
+                    // Axis and VA are excluded, as on Refined Refraction.
+                    signedLabels: const {'Spherical', 'Cylindrical'},
                     dataLE: {
                       'Spherical': FormatHelper.formatPositiveValue(
                           cubit.leftOldSpherical),
@@ -125,6 +127,8 @@ class _ExaminationReviewScreenState extends State<ExaminationReviewScreen>
                   _buildSynchronizedExaminationSection(
                     title: 'Auto-refraction',
                     sectionIndex: 0,
+                    // Axis and VA are excluded, as on Refined Refraction.
+                    signedLabels: const {'Spherical', 'Cylindrical'},
                     dataLE: {
                       'Spherical': FormatHelper.formatPositiveValue(
                           cubit.leftAurorefSpherical),

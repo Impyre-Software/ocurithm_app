@@ -19,11 +19,16 @@ extension GetCapabilitiesStatusX on GetCapabilitiesStatus {
 class GetCapabilitiesState {
   final GetCapabilitiesStatus status;
   final List<Capability>? capabilities;
+
+  /// Areas and bundles; null when the API predates them or the call failed, in
+  /// which case the editor falls back to a flat list.
+  final CapabilityCatalog? catalog;
   final String? errorMessage;
 
   const GetCapabilitiesState({
     this.status = GetCapabilitiesStatus.initial,
     this.capabilities,
+    this.catalog,
     this.errorMessage,
   });
 
@@ -37,11 +42,13 @@ class GetCapabilitiesState {
   GetCapabilitiesState copyWith({
     GetCapabilitiesStatus? status,
     List<Capability>? capabilities,
+    CapabilityCatalog? catalog,
     String? errorMessage,
   }) {
     return GetCapabilitiesState(
       status: status ?? this.status,
       capabilities: capabilities ?? this.capabilities,
+      catalog: catalog ?? this.catalog,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }

@@ -1032,6 +1032,7 @@ class _DoctorFormViewState extends State<DoctorFormView> {
         if (state.isSuccess && state.capabilities != null) {
           return CapabilitiesSection(
             capabilities: state.capabilities!,
+            catalog: state.catalog,
             readOnly: _isReadOnly,
             initialSelectedCapabilities: capabilities ?? [],
             onSelectionChanged: (newSelection) {

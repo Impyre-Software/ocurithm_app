@@ -593,20 +593,40 @@ class _AppointmentsSection extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 10.w, vertical: 4.h),
-                                decoration: BoxDecoration(
-                                  color: statusColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  appointment.status?.toUpperCase() ?? 'N/A',
-                                  style: TextStyle(
-                                    fontSize: 10.sp,
-                                    fontWeight: FontWeight.w800,
-                                    color: statusColor,
-                                    letterSpacing: 0.5,
+                              Flexible(
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 10.w, vertical: 4.h),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  // A parked or cancelled visit also names why:
+                                  // "SAVED · Dilation", "CANCELLED · No-show".
+                                  child: Text.rich(
+                                    TextSpan(
+                                      text: appointment.status?.toUpperCase() ??
+                                          'N/A',
+                                      children: [
+                                        if (appointment.statusReason != null)
+                                          TextSpan(
+                                            text:
+                                                ' · ${appointment.statusReason}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              letterSpacing: 0,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10.sp,
+                                      fontWeight: FontWeight.w800,
+                                      color: statusColor,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
                                 ),
                               ),

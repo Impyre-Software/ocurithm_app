@@ -21,7 +21,8 @@ abstract class AppointmentRepo {
       {required String id,
       required String action,
       DateTime? date,
-      String? doctor});
+      String? doctor,
+      AppointmentCancellationReason? cancellationReason});
 
   /// Reorders a doctor's daily queue. [orderedIds] are that doctor's active
   /// appointments for the day in their new order; the server assigns

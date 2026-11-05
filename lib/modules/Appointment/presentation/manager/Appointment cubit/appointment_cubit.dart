@@ -151,6 +151,7 @@ class AppointmentCubit extends Bloc<AppointmentEvent, AppointmentState> {
         action: event.action,
         date: event.date,
         doctor: event.doctor,
+        cancellationReason: event.cancellationReason,
       );
 
       SnackbarService.showSuccess(
